@@ -1,142 +1,160 @@
 const { db } = require('../data/db.js');
 
-// OBTENER TODAS LAS SUBTAREAS ASOCIADAS A UNA TAREA
-exports.getSubtasksByTaskId = (req, res) => {
-  const { taskId } = req.params;
+// Formatea fecha a "yyyy-mm-dd HH:MM"
+function formatDateForGantt(dateInput) {
+  const d = new Date(dateInput);
+  if (isNaN(d)) return null;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
 
-  const sql = `SELECT * FROM subTareas WHERE task_id = ?`;
-  db.all(sql, [taskId], (err, rows) => {
-    if (err) {
-      console.error('Error obteniendo subTareas:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows);
-  });
-};
-
-// OBTENER TODAS LAS SUBTAREAS SIN TAREA ASIGNADA (HUÉRFANAS)
-exports.getUnassignedSubtasks = (req, res) => {
-  const sql = `SELECT * FROM subTareas WHERE task_id IS NULL`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error('Error obteniendo subtareas sin asignar:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows);
-  });
-};
-
-// CREAR SUBTAREA ASOCIADA A UNA TAREA
-exports.createSubtask = (req, res) => {
-  const { taskId } = req.params;
-  const { title, description } = req.body;
-
-  db.get('SELECT id FROM tareas WHERE id = ?', [taskId], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: 'Error al verificar tarea padre' });
-    }
-
-    if (!row) {
-      return res.status(400).json({ error: `La tarea con ID ${taskId} no existe` });
-    }
-
-    db.run(`
-      INSERT INTO subTareas (task_id, title, description)
-      VALUES (?, ?, ?)
-    `, [taskId, title, description], function (err) {
-      if (err) {
-        return res.status(500).json({ error: 'Error al crear subtarea' });
-      }
-
-      res.status(201).json({ message: 'Subtarea creada', subTareaId: this.lastID });
+// Valida que el parent exista (cualquier tarea puede ser parent ahora)
+function checkParentExists(parentId) {
+  return new Promise((resolve, reject) => {
+    if (!parentId || parentId === 0) return resolve(false);
+    db.get('SELECT id FROM tareas WHERE id = ?', [parentId], (err, row) => {
+      if (err) return reject(err);
+      resolve(!!row);
     });
   });
-};
+}
 
-// ACTUALIZAR SUBTAREA
-exports.updateSubtask = (req, res) => {
-  const { id } = req.params;
-  const { title, description, completed } = req.body;
+// OBTENER SUBTAREAS (hijos) DE CUALQUIER TAREA
+exports.getSubTasksByParent = (req, res) => {
+  const parentId = parseInt(req.params.parentId, 10);
+  if (isNaN(parentId)) return res.status(400).json({ error: 'parentId inválido' });
 
-  const sql = `UPDATE subTareas SET title = ?, description = ?, completed = ? WHERE id = ?`;
-  db.run(sql, [title, description, completed ? 1 : 0, id], function (err) {
+  db.all('SELECT * FROM tareas WHERE parent = ?', [parentId], (err, rows) => {
     if (err) {
-      console.error('Error actualizando subTarea:', err.message);
+      console.error('Error leyendo subtareas:', err.message);
       return res.status(500).json({ error: err.message });
     }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Subtarea no encontrada' });
-    }
-    res.json({ message: 'Subtarea actualizada correctamente' });
+
+    const ganttSubTasks = rows.map(t => ({
+      id: t.id,
+      text: t.title,
+      start_date: formatDateForGantt(t.start_date) || formatDateForGantt(new Date()),
+      duration: t.duration || 1,
+      progress: t.progress || 0,
+      parent: t.parent,
+      type: t.type || 'task'
+    }));
+
+    res.json({ data: ganttSubTasks });
   });
 };
 
-// ELIMINAR SUBTAREA
-exports.deleteSubtask = (req, res) => {
-  const { id } = req.params;
+// CREAR TAREA (principal o subtarea anidada)
+exports.createSubTask = async (req, res) => {
+  let { text, start_date, duration, progress, parent, type } = req.body;
 
-  const sql = `DELETE FROM subTareas WHERE id = ?`;
-  db.run(sql, [id], function (err) {
-    if (err) {
-      console.error('Error eliminando subTarea:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Subtarea no encontrada' });
-    }
-    res.json({ message: 'Subtarea eliminada correctamente' });
-  });
-};
+  if (!text || !start_date || !duration) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (text, start_date, duration)' });
+  }
 
-// REASIGNAR SUBTAREA A OTRA TAREA
-exports.reassignSubtask = (req, res) => {
-  const { id } = req.params;
-  const { newTaskId } = req.body;
+  const formattedStartDate = formatDateForGantt(start_date);
+  if (!formattedStartDate) {
+    return res.status(400).json({ error: 'start_date inválida' });
+  }
 
-  const sql = `UPDATE subTareas SET task_id = ? WHERE id = ?`;
-  db.run(sql, [newTaskId, id], function (err) {
-    if (err) {
-      console.error('Error reasignando subtarea:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Subtarea no encontrada' });
-    }
-    res.json({ message: 'Subtarea reasignada correctamente' });
-  });
-};
-
-// CONVERTIR SUBTAREA EN TAREA PRINCIPAL
-exports.convertSubtaskToTask = (req, res) => {
-  const { id } = req.params;
-
-  db.get('SELECT * FROM subTareas WHERE id = ?', [id], (err, subtask) => {
-    if (err) {
-      console.error('Error leyendo subTarea:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-    if (!subtask) {
-      return res.status(404).json({ error: 'Subtarea no encontrada' });
-    }
-
-    const insertSql = `INSERT INTO tareas (title, description, status) VALUES (?, ?, ?)`;
-    db.run(insertSql, [subtask.title, subtask.description, 'pendiente'], function (err) {
-      if (err) {
-        console.error('Error creando tarea desde subTarea:', err.message);
-        return res.status(500).json({ error: err.message });
+  try {
+    // Si parent está definido, verificar que exista
+    if (parent !== null && parent !== 0 && typeof parent !== 'undefined') {
+      if (typeof parent !== 'number') {
+        return res.status(400).json({ error: 'parent debe ser un número' });
       }
 
-      db.run('DELETE FROM subTareas WHERE id = ?', [id], function (err) {
+      const parentExists = await checkParentExists(parent);
+      if (!parentExists) {
+        return res.status(400).json({ error: 'El parent indicado no existe' });
+      }
+    }
+
+    type = type || 'task';
+
+    db.run(
+      `INSERT INTO tareas (title, start_date, duration, progress, parent, type) VALUES (?, ?, ?, ?, ?, ?)`,
+      [text, formattedStartDate, duration, progress || 0, parent || 0, type],
+      function (err) {
         if (err) {
-          console.error('Error eliminando subTarea original:', err.message);
+          console.error('Error creando tarea:', err.message);
           return res.status(500).json({ error: err.message });
         }
 
-        res.json({
-          message: 'Subtarea convertida en tarea correctamente',
-          newTaskId: this.lastID
+        res.status(201).json({
+          id: this.lastID,
+          text,
+          start_date: formattedStartDate,
+          duration,
+          progress: progress || 0,
+          parent: parent || 0,
+          type
         });
-      });
-    });
+      }
+    );
+  } catch (err) {
+    console.error('Error validando parent:', err.message);
+    res.status(500).json({ error: 'Error validando parent' });
+  }
+};
+
+// ACTUALIZAR TAREA
+exports.updateSubTask = async (req, res) => {
+  const { id } = req.params;
+  let { text, start_date, duration, progress, type, parent } = req.body;
+
+  if (!text || !start_date || !duration || typeof parent === 'undefined') {
+    return res.status(400).json({ error: 'Faltan campos requeridos (text, start_date, duration, parent)' });
+  }
+
+  const formattedStartDate = formatDateForGantt(start_date);
+  if (!formattedStartDate) {
+    return res.status(400).json({ error: 'start_date inválida' });
+  }
+
+  if (parent !== null && parent !== 0) {
+    if (typeof parent !== 'number') {
+      return res.status(400).json({ error: 'parent debe ser un número' });
+    }
+
+    const parentExists = await checkParentExists(parent);
+    if (!parentExists) {
+      return res.status(400).json({ error: 'El parent indicado no existe' });
+    }
+  }
+
+  db.run(
+    `UPDATE tareas SET title = ?, start_date = ?, duration = ?, progress = ?, type = ?, parent = ? WHERE id = ?`,
+    [text, formattedStartDate, duration, progress || 0, type || 'task', parent || 0, id],
+    function (err) {
+      if (err) {
+        console.error('Error actualizando tarea:', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Tarea no encontrada' });
+      }
+      res.json({ message: 'Tarea actualizada' });
+    }
+  );
+};
+
+// ELIMINAR TAREA (subtarea o principal)
+exports.deleteSubTask = (req, res) => {
+  const { id } = req.params;
+
+  db.run(`DELETE FROM tareas WHERE id = ?`, [id], function (err) {
+    if (err) {
+      console.error('Error eliminando tarea:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    res.json({ message: 'Tarea eliminada' });
   });
 };

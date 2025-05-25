@@ -7,6 +7,12 @@
   pointer-events: none;
 }
 
+/* Ocultar botón + en subtareas (nodos con parent distinto de 0) */
+.gantt_tree_row[data-parent]:not([data-parent="0"]) .gantt_add {
+  display: none !important;
+}
+
+
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {
     animation: App-logo-spin infinite 20s linear;

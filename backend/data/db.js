@@ -4,58 +4,46 @@ const db = new sqlite3.Database('./data/database.sqlite', (err) => {
   if (err) {
     console.error('Error al conectar con SQLite:', err.message);
   } else {
-    console.log('Conectado a la base de datos SQLite');
-
-    db.run("PRAGMA foreign_keys = ON;", (err) => {
-      if (err) {
-        console.error('Error activando foreign keys:', err.message);
-      } else {
-        console.log('Foreign keys activadas');
-      }
-    });
+    console.log('Conectado a SQLite');
   }
 });
 
-function initDB() {
-  db.serialize(() => {
-    // TAREAS
-    db.run(`CREATE TABLE IF NOT EXISTS tareas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      due_date TEXT,
-      status TEXT DEFAULT 'pendiente',
-      parent_id INTEGER,
-      FOREIGN KEY (parent_id) REFERENCES tareas(id)
-    )`, (err) => {
-      if (err) {
-        console.error('Error creando tabla tareas:', err.message);
-      } else {
-        console.log('Tabla tareas creada');
-      }
-    });
-    
-    // SUB_TAREAS
-    db.run(`CREATE TABLE IF NOT EXISTS subTareas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      completed INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY(task_id) REFERENCES tareas(id) ON DELETE CASCADE
-    )`, (err) => {
-      if (err) {
-        console.error('Error creando tabla subTareas:', err.message);
-      } else {
-        console.log('Tabla subTareas creada');
-      }
+function runAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this);
     });
   });
 }
 
+function allAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+async function initDB() {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS tareas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      duration INTEGER NOT NULL,
+      progress REAL DEFAULT 0,
+      parent INTEGER DEFAULT 0
+    )
+  `;
+  await runAsync(sql);
+  console.log('Tabla tareas creada o ya existía');
+}
+
 module.exports = {
   db,
-  initDB
+  initDB,
+  runAsync,
+  allAsync
 };

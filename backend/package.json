@@ -4,8 +4,8 @@
   "description": "Backend para servir la API y el frontend de React.",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",                          
-    "dev": "nodemon app.js",                           
+    "start": "node app.js",
+    "dev": "nodemon app.js",
     "postinstall": "cd ../frontend && npm install && npm run build"
   },
   "dependencies": {
