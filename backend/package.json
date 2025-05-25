@@ -1,17 +1,22 @@
 {
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Backend para servir la API y el frontend de React.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",                          
+    "dev": "nodemon app.js",                           
+    "postinstall": "cd ../client && npm install && npm run build"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "nodemon": "^3.1.10"
+    "sqlite3": "^5.1.7"
   },
-  "name": "backend",
-  "version": "1.0.0",
-  "main": "app.js",
-  "scripts": {
-    "start": "nodemon app.js"
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "description": ""
+  "license": "ISC"
 }
