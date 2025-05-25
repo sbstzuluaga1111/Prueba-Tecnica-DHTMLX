@@ -1,4 +1,4 @@
-const db = require('../data/db');
+const db = require('../data/db.js');
 
 exports.getSubtasksByTaskId = (req, res) => {
   const { taskId } = req.params;
@@ -14,18 +14,19 @@ exports.getSubtasksByTaskId = (req, res) => {
 };
 
 exports.createSubtask = (req, res) => {
-  const { task_id, title, description } = req.body;
+  const { taskId } = req.params;
+  const { title, description } = req.body;
 
-  if (!task_id || !title) {
-    return res.status(400).json({ error: 'task_id y title son obligatorios' });
+  if (!taskId || !title) {
+    return res.status(400).json({ error: 'taskId y title son obligatorios' });
   }
 
   const sql = `INSERT INTO subTareas (task_id, title, description) VALUES (?, ?, ?)`;
-  db.run(sql, [task_id, title, description], function (err) {
+  db.run(sql, [taskId, title, description], function (err) {
     if (err) {
       console.error('Error creando subTarea:', err.message);
       return res.status(500).json({ error: err.message });
     }
-    res.status(201).json({ id: this.lastID, task_id, title, description, completed: 0 });
+    res.status(201).json({ id: this.lastID, task_id: taskId, title, description, completed: 0 });
   });
 };

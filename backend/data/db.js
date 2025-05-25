@@ -5,6 +5,15 @@ const db = new sqlite3.Database('./data/database.sqlite', (err) => {
     console.error('Error al conectar con SQLite:', err.message);
   } else {
     console.log('Conectado a la base de datos SQLite');
+
+    // Activar claves foráneas para que ON DELETE CASCADE funcione
+    db.run("PRAGMA foreign_keys = ON;", (err) => {
+      if (err) {
+        console.error('Error activando foreign keys:', err.message);
+      } else {
+        console.log('Foreign keys activadas');
+      }
+    });
   }
 });
 
@@ -32,7 +41,7 @@ function initDB() {
       task_id INTEGER NOT NULL,
       title TEXT NOT NULL,
       description TEXT,
-      completed BOOLEAN DEFAULT 0,
+      completed INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(task_id) REFERENCES tareas(id) ON DELETE CASCADE
     )`, (err) => {
