@@ -1,7 +1,6 @@
-// controllers/linksController.js
 const { db } = require('../data/db');
 
-// Obtener todos los enlaces
+// MOSTRAR ENLACES
 exports.getAllLinks = (req, res) => {
   db.all('SELECT * FROM links', [], (err, rows) => {
     if (err) {
@@ -12,7 +11,7 @@ exports.getAllLinks = (req, res) => {
   });
 };
 
-// Crear un nuevo enlace
+// CREAR ENLACES
 exports.createLink = (req, res) => {
   const { source, target, type } = req.body;
 
@@ -38,7 +37,7 @@ exports.createLink = (req, res) => {
   );
 };
 
-// Actualizar un enlace
+// ACTUALIZAR ENLACES
 exports.updateLink = (req, res) => {
   const { id } = req.params;
   const { source, target, type } = req.body;
@@ -63,7 +62,7 @@ exports.updateLink = (req, res) => {
   );
 };
 
-// Eliminar enlace
+// ELIMINAR ENLACES
 exports.deleteLink = (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM links WHERE id = ?', [id], function (err) {

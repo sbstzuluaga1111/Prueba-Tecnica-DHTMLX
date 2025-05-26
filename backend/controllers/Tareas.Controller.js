@@ -1,6 +1,6 @@
 const { db } = require('../data/db.js');
 
-// Formatea fecha a "yyyy-mm-dd HH:MM"
+// FORMATO DE FECHA
 function formatDateForGantt(dateInput) {
   const d = new Date(dateInput);
   if (isNaN(d)) return null;
