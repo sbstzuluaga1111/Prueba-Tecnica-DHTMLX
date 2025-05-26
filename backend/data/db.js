@@ -27,18 +27,28 @@ function allAsync(sql, params = []) {
 }
 
 async function initDB() {
-  const sql = `
-    CREATE TABLE IF NOT EXISTS tareas (
+  const sqlTareas = `
+  CREATE TABLE IF NOT EXISTS tareas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    duration INTEGER NOT NULL,
+    progress REAL DEFAULT 0,
+    parent INTEGER DEFAULT 0,
+    type TEXT DEFAULT 'task'
+  )
+`;
+  await runAsync(sqlTareas);
+
+  const sqlLinks = `
+    CREATE TABLE IF NOT EXISTS links (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      start_date TEXT NOT NULL,
-      duration INTEGER NOT NULL,
-      progress REAL DEFAULT 0,
-      parent INTEGER DEFAULT 0
+      source INTEGER NOT NULL,
+      target INTEGER NOT NULL,
+      type TEXT NOT NULL
     )
   `;
-  await runAsync(sql);
-  console.log('Tabla tareas creada o ya existía');
+  await runAsync(sqlLinks); 
 }
 
 module.exports = {

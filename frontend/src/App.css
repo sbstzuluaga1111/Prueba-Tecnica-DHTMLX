@@ -7,11 +7,11 @@
   pointer-events: none;
 }
 
-/* Ocultar botón + en subtareas (nodos con parent distinto de 0) */
-.gantt_tree_row[data-parent]:not([data-parent="0"]) .gantt_add {
-  display: none !important;
+.Text{
+  display: flex;
+  text-align: center;
+  justify-content: center;
 }
-
 
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {

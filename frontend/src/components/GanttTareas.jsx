@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import "../App.css"
 import gantt from 'dhtmlx-gantt';
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
 
@@ -13,23 +14,22 @@ const GanttTareas = () => {
   useEffect(() => {
     gantt.config.xml_date = "%Y-%m-%d %H:%i";
     gantt.init(ganttContainer.current);
-    cargarTareas();
+    cargarDatosGantt();
     configurarEventos();
 
-    const currentEventIds = eventIds.current;
+    const eventos = eventIds.current;
     return () => {
       gantt.clearAll();
-      currentEventIds.forEach(id => gantt.detachEvent(id));
+      eventos.forEach(id => gantt.detachEvent(id));
     };
   }, []);
 
-  const cargarTareas = async () => {
+  const cargarDatosGantt = async () => {
     try {
       const resTareas = await fetch(`${API_URL}/tareas`);
       const tareas = await resTareas.json();
       const todasLasTareas = [...tareas.data];
 
-      // Función recursiva para obtener subtareas de cualquier nivel
       const cargarSubtareasRecursivas = async (tareasPadre) => {
         for (const tarea of tareasPadre) {
           const resSub = await fetch(`${API_URL}/tareas/${tarea.id}/subtareas`);
@@ -43,17 +43,24 @@ const GanttTareas = () => {
 
       await cargarSubtareasRecursivas(tareas.data);
 
-      gantt.parse({ data: todasLasTareas });
+      const resLinks = await fetch(`${API_URL}/links`);
+      const linksData = await resLinks.json();
+      const links = linksData.data || [];
+
+      gantt.parse({
+        data: todasLasTareas,
+        links: links
+      });
     } catch (error) {
-      console.error('Error al cargar las tareas:', error);
+      console.error('Error al cargar las tareas o links:', error);
     }
   };
 
   const configurarEventos = () => {
+    // Crear tarea
     const onAddId = gantt.attachEvent('onAfterTaskAdd', async (id, task) => {
       try {
         const isSubtask = task.parent && task.parent !== 0;
-
         const url = isSubtask
           ? `${API_URL}/tareas/${task.parent}/subtareas`
           : `${API_URL}/tareas`;
@@ -89,10 +96,10 @@ const GanttTareas = () => {
     });
     eventIds.current.push(onAddId);
 
+    // Actualizar tarea
     const onUpdateId = gantt.attachEvent('onAfterTaskUpdate', async (id, task) => {
       try {
         const isSubtask = task.parent && task.parent !== 0;
-
         const url = isSubtask
           ? `${API_URL}/subtareas/${id}`
           : `${API_URL}/tareas/${id}`;
@@ -117,12 +124,11 @@ const GanttTareas = () => {
     });
     eventIds.current.push(onUpdateId);
 
+    // Eliminar tarea
     const onDeleteId = gantt.attachEvent('onAfterTaskDelete', async (id, task) => {
       try {
         if (task.skipBackendDelete) return;
-
         const isSubtask = task && task.parent && task.parent !== 0;
-
         const url = isSubtask
           ? `${API_URL}/subtareas/${id}`
           : `${API_URL}/tareas/${id}`;
@@ -133,11 +139,70 @@ const GanttTareas = () => {
       }
     });
     eventIds.current.push(onDeleteId);
+
+    // Crear link
+    const onLinkAddId = gantt.attachEvent('onAfterLinkAdd', async (id, link) => {
+      try {
+        const body = {
+          source: link.source,
+          target: link.target,
+          type: link.type,
+        };
+        const res = await fetch(`${API_URL}/links`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data && data.id) {
+          gantt.changeLinkId(id, data.id);
+        } else {
+          gantt.deleteLink(id);
+          console.error('No se recibió ID al crear link:', data);
+        }
+      } catch (error) {
+        gantt.deleteLink(id);
+        console.error('Error al crear link:', error);
+      }
+    });
+    eventIds.current.push(onLinkAddId);
+
+    // Actualizar link
+    const onLinkUpdateId = gantt.attachEvent('onAfterLinkUpdate', async (id, link) => {
+      try {
+        const body = {
+          source: link.source,
+          target: link.target,
+          type: link.type,
+        };
+        await fetch(`${API_URL}/links/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch (error) {
+        console.error('Error al actualizar link:', error);
+      }
+    });
+    eventIds.current.push(onLinkUpdateId);
+
+    // Eliminar link
+    const onLinkDeleteId = gantt.attachEvent('onAfterLinkDelete', async (id) => {
+      try {
+        await fetch(`${API_URL}/links/${id}`, {
+          method: 'DELETE',
+        });
+      } catch (error) {
+        console.error('Error al eliminar link:', error);
+      }
+    });
+    eventIds.current.push(onLinkDeleteId);
   };
 
   return (
     <div>
-      <h2 style={{ marginBottom: '1rem' }}>Gantt de Tareas</h2>
+      <h2 className='Text' style={{ marginBottom: '1rem' }}>Gantt de Tareas</h2>
       <div ref={ganttContainer} style={{ width: '100%', height: '600px' }} />
     </div>
   );
